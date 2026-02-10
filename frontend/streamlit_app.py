@@ -1,9 +1,21 @@
 from datetime import datetime
+import os
 
 import requests
 import streamlit as st
 
-API_BASE_URL = st.secrets.get("api_base_url", "http://localhost:8000")
+
+def resolve_api_base_url() -> str:
+    """Resolve API base URL from Streamlit secrets/env with safe normalization."""
+    url = (
+        st.secrets.get("api_base_url")
+        or os.getenv("API_BASE_URL")
+        or "http://localhost:8000"
+    )
+    return str(url).rstrip("/")
+
+
+API_BASE_URL = resolve_api_base_url()
 
 st.set_page_config(page_title="DecisionPilot SaaS", page_icon="📊", layout="wide")
 
@@ -44,11 +56,27 @@ def auth_headers() -> dict[str, str]:
 
 
 def api_post(path: str, **kwargs):
-    return requests.post(f"{API_BASE_URL}{path}", timeout=45, **kwargs)
+    try:
+        return requests.post(f"{API_BASE_URL}{path}", timeout=45, **kwargs)
+    except requests.RequestException as exc:
+        st.error(
+            f"Unable to reach API at {API_BASE_URL}. "
+            "Set `api_base_url` in Streamlit secrets or `API_BASE_URL` env var."
+        )
+        st.caption(f"Connection details: {exc}")
+        st.stop()
 
 
 def api_get(path: str, **kwargs):
-    return requests.get(f"{API_BASE_URL}{path}", timeout=45, **kwargs)
+    try:
+        return requests.get(f"{API_BASE_URL}{path}", timeout=45, **kwargs)
+    except requests.RequestException as exc:
+        st.error(
+            f"Unable to reach API at {API_BASE_URL}. "
+            "Set `api_base_url` in Streamlit secrets or `API_BASE_URL` env var."
+        )
+        st.caption(f"Connection details: {exc}")
+        st.stop()
 
 
 with st.sidebar:

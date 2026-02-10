@@ -1,123 +1,115 @@
-# VisionPilot AI — Advanced 3D Decision Intelligence Platform
+# VisionPilot AI - 3D Decision Intelligence Platform
 
-VisionPilot AI is a modular enterprise platform that blends **real-time analytics**, **3D business intelligence**, and an **AI decision engine** for executive planning.
+Production-ready authentication starter for **FastAPI + Streamlit** with Render/Streamlit Cloud deployment support.
 
-## Core Stack
-- **Frontend:** Streamlit + Plotly + Three.js (embedded) + PyThreeJS dependency
-- **Backend:** FastAPI
-- **Database:** PostgreSQL (Supabase-compatible)
-- **ML:** Scikit-learn + XGBoost (fallback-aware)
-- **Auth:** JWT-ready with Supabase environment hooks
-- **Deployment:** Docker + Streamlit Cloud friendly
+## Folder Structure
 
-## Features Implemented
-1. **Authentication + Roles**
-   - Email/password auth
-   - Roles: `ceo`, `cto`, `manager`, `analyst`
-   - Session via JWT bearer tokens
-
-2. **3D Business Intelligence Dashboard**
-   - Interactive animated Three.js KPI cubes + revenue pyramid
-   - Plotly live KPI pulse chart
-   - Dark neon glassmorphism UI
-
-3. **Real-Time Analytics API**
-   - Revenue/cost/profit tracking
-   - Profit forecasting
-   - Churn probability and employee score outputs
-
-4. **AI Decision Engine**
-   - Risk score interpretation
-   - Strategy recommendations
-   - Market trend signal
-   - Scenario impact mapping
-
-5. **Data Management**
-   - CSV/Excel upload
-   - Auto-cleaning + feature engineering
-   - Dataset version records
-
-6. **Executive Reports**
-   - Auto-generated board-ready PDF reports
-   - KPI table + risk alerts + recommendation section
-
-7. **Scenario Simulator**
-   - Monte Carlo what-if simulation
-   - Budget / demand / hiring impact forecasting
-
-8. **Admin Panel**
-   - User + subscription overview
-   - API latency monitoring snapshot
-   - Billing events count
-
----
-
-## Project Structure
 ```text
 backend/
-  app/
-    api/                # auth, analysis, intelligence, admin routes
-    core/               # config + security
-    db/                 # SQLAlchemy session
-    models/             # multi-tenant entities + metrics tables
-    schemas/            # Pydantic contracts
-    services/           # analytics, decisioning, reporting, subscription logic
-  tests/                # service-level tests
+  main.py
+  database.py
+  models.py
+  auth.py
+  requirements.txt
 frontend/
-  streamlit_app.py      # futuristic dashboard UI
-scripts/
-  seed_sample_users.py  # demo user seeding
-data/
-  demo_business_data.csv
-Dockerfiles + docker-compose.yml
-requirements.txt
-docs/DEPLOYMENT.md
+  app.py
+  auth_ui.py
+  api.py
+  config.py
+  requirements.txt
+.env.example
+runtime.txt
+README.md
 ```
 
-## Quick Start
+## Backend (FastAPI)
+
+### Features
+- `/auth/register` with duplicate-user prevention
+- `/auth/login` returning JWT bearer token
+- `/auth/me` protected profile endpoint
+- `/health` health check for deployment monitoring
+- SQLite (default) via SQLAlchemy
+- Password hashing with `passlib[bcrypt]`
+- JWT auth with `python-jose`
+- CORS configured from env (`ALLOWED_ORIGINS`)
+- Security headers middleware
+- Structured logging + global exception handling
+
+### Run backend locally
+
 ```bash
+cd backend
+python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-cp backend/.env.example backend/.env  # if not present, create based on docs
-docker compose up --build
+cp ../.env.example .env
+uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-- API: http://localhost:8000
-- Streamlit UI: http://localhost:8501
+## Frontend (Streamlit)
 
-## Demo Credentials (after seeding)
-Run:
-```bash
-PYTHONPATH=backend python scripts/seed_sample_users.py
-```
+### Features
+- Dark, high-contrast UI
+- Login/Register forms with input validation
+- Loading spinners + success/error alerts
+- API timeout and offline handling
+- Token stored in Streamlit session state
+- Dashboard only visible after login
 
-Users (password for all: `VisionPilot#2026`):
-- ceo@visionpilot.ai
-- cto@visionpilot.ai
-- manager@visionpilot.ai
-- analyst@visionpilot.ai
-
-## Supabase Notes
-Set these in backend environment for Supabase-hosted Postgres/Auth alignment:
-- `DATABASE_URL`
-- `SUPABASE_URL`
-- `SUPABASE_ANON_KEY`
-- `SUPABASE_JWT_SECRET`
-
-See full deployment checklist in `docs/DEPLOYMENT.md`.
-
-
-## Frontend ↔ Backend API Configuration
-Set this environment variable for Streamlit (local or Streamlit Cloud):
+### Run frontend locally
 
 ```bash
-API_BASE_URL=https://visionpilot-backend.onrender.com
+cd frontend
+python -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+export API_BASE_URL=http://localhost:8000
+streamlit run app.py
 ```
 
-The frontend automatically falls back to this hosted endpoint when the variable is not set.
+## Deployment Steps
 
-## Production Readiness Checklist
-- Deploy backend with `backend/render.yaml` (or Dockerfile) and configure persistent Postgres.
-- Keep `SECRET_KEY` and `DATABASE_URL` in secure environment variables.
-- Set `ALLOWED_ORIGINS=*` (or explicit domains) for CORS based on your security posture.
-- Set Streamlit secret/environment variable `API_BASE_URL` to the backend service URL.
-- Health check endpoint: `/health`.
+### Render (Backend)
+1. Create new **Web Service** from repo.
+2. Root directory: `backend`
+3. Build command: `pip install -r requirements.txt`
+4. Start command: `uvicorn main:app --host 0.0.0.0 --port $PORT`
+5. Add environment variables from `.env.example` (set strong `SECRET_KEY`).
+6. Health check path: `/health`
+
+### Streamlit Cloud (Frontend)
+1. Create app from repo.
+2. Main file path: `frontend/app.py`
+3. Add secrets:
+   - `API_BASE_URL = "https://<your-render-backend>.onrender.com"`
+   - `REQUEST_TIMEOUT_SECONDS = "20"`
+
+## Testing Steps
+
+### API smoke test
+
+```bash
+curl http://localhost:8000/health
+curl -X POST http://localhost:8000/auth/register \
+  -H 'Content-Type: application/json' \
+  -d '{"full_name":"Demo User","email":"demo@example.com","password":"DemoPass#123"}'
+curl -X POST http://localhost:8000/auth/login \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"demo@example.com","password":"DemoPass#123"}'
+```
+
+## Troubleshooting Guide
+
+- **404 / Not Found for signup/login**
+  - Verify backend is running and paths are exactly `/auth/register` and `/auth/login`.
+- **Server offline on frontend**
+  - Confirm `API_BASE_URL` points to live backend URL.
+  - Check Render service logs and `/health` endpoint.
+- **Login fails**
+  - Ensure same email casing (system normalizes to lowercase).
+  - Confirm user exists and password is 8+ chars.
+- **CORS errors**
+  - Set `ALLOWED_ORIGINS` to frontend domain(s), comma-separated.
+- **Invalid token / session reset**
+  - Ensure `SECRET_KEY` is stable across backend restarts.
+- **Text contrast issues**
+  - UI style is high-contrast dark mode; clear browser cache if stale CSS appears.

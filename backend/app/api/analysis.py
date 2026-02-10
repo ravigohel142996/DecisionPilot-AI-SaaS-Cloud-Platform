@@ -2,24 +2,29 @@ from io import BytesIO
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
+codex/build-saas-version-of-decisionpilot-ai-6zmbvb
+from sqlalchemy import desc, select
 codex/build-saas-version-of-decisionpilot-ai-oqeah7
 from sqlalchemy import desc, select
-=======
+main
 main
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
 from app.db.session import get_db
 from app.models.entities import CSVUpload, User
+codex/build-saas-version-of-decisionpilot-ai-6zmbvb
 codex/build-saas-version-of-decisionpilot-ai-oqeah7
+main
 from app.schemas.analysis import UploadListItem, UploadListResponse, UploadResponse
 from app.services.analysis import summarize_csv
 from app.services.reporting import build_executive_pdf
 from app.services.subscription import assert_upload_allowed
-=======
+codex/build-saas-version-of-decisionpilot-ai-6zmbvb
 from app.schemas.analysis import UploadResponse
 from app.services.analysis import summarize_csv
 from app.services.reporting import build_executive_pdf
+main
 main
 
 router = APIRouter(prefix="/analysis", tags=["analysis"])
@@ -31,7 +36,9 @@ async def upload_csv(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+codex/build-saas-version-of-decisionpilot-ai-6zmbvb
 codex/build-saas-version-of-decisionpilot-ai-oqeah7
+main
     if not file.filename or not file.filename.lower().endswith(".csv"):
         raise HTTPException(status_code=400, detail="Only CSV files are allowed")
 
@@ -45,12 +52,13 @@ codex/build-saas-version-of-decisionpilot-ai-oqeah7
         _, summary = summarize_csv(content)
     except Exception as exc:
         raise HTTPException(status_code=400, detail=f"Unable to parse CSV: {exc}") from exc
-=======
+codex/build-saas-version-of-decisionpilot-ai-6zmbvb
     if not file.filename.lower().endswith(".csv"):
         raise HTTPException(status_code=400, detail="Only CSV files are allowed")
 
     content = await file.read()
     _, summary = summarize_csv(content)
+main
 main
 
     upload = CSVUpload(
@@ -65,7 +73,9 @@ main
 
     return UploadResponse(upload_id=upload.id, summary=summary, created_at=upload.created_at)
 
+codex/build-saas-version-of-decisionpilot-ai-6zmbvb
 codex/build-saas-version-of-decisionpilot-ai-oqeah7
+main
 @router.get("/uploads", response_model=UploadListResponse)
 def list_uploads(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     rows = db.scalars(
@@ -77,7 +87,8 @@ def list_uploads(current_user: User = Depends(get_current_user), db: Session = D
     return UploadListResponse(items=[UploadListItem(id=r.id, filename=r.filename, created_at=r.created_at) for r in rows])
 
 
-=======
+codex/build-saas-version-of-decisionpilot-ai-6zmbvb
+main
 main
 @router.get("/report/{upload_id}")
 def generate_report(

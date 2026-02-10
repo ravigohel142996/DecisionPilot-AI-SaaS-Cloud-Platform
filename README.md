@@ -104,3 +104,20 @@ Set these in backend environment for Supabase-hosted Postgres/Auth alignment:
 - `SUPABASE_JWT_SECRET`
 
 See full deployment checklist in `docs/DEPLOYMENT.md`.
+
+
+## Frontend ↔ Backend API Configuration
+Set this environment variable for Streamlit (local or Streamlit Cloud):
+
+```bash
+API_BASE_URL=https://visionpilot-backend.onrender.com
+```
+
+The frontend automatically falls back to this hosted endpoint when the variable is not set.
+
+## Production Readiness Checklist
+- Deploy backend with `backend/render.yaml` (or Dockerfile) and configure persistent Postgres.
+- Keep `SECRET_KEY` and `DATABASE_URL` in secure environment variables.
+- Set `ALLOWED_ORIGINS=*` (or explicit domains) for CORS based on your security posture.
+- Set Streamlit secret/environment variable `API_BASE_URL` to the backend service URL.
+- Health check endpoint: `/health`.

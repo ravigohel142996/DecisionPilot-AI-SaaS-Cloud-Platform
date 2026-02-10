@@ -94,3 +94,19 @@ python tools/validate_python_sources.py
 
 The first command detects unresolved merge markers, and the second validates every tracked Python file for syntax errors (including accidental standalone branch-label lines).
 
+## Conflict-resolution checklist
+
+When GitHub shows **"This branch has conflicts that must be resolved"**, resolve in this order:
+
+1. Keep functional backend/API changes from both sides.
+2. Prefer the **combined** merge-safety workflow (marker scan + python validation + compile checks).
+3. Remove all conflict markers and accidental branch-label text.
+4. Run the validation commands below before pushing.
+
+```bash
+python tools/check_conflict_markers.py
+python tools/validate_python_sources.py
+python -m py_compile frontend/streamlit_app.py
+python -m compileall backend/app backend/tests
+```
+

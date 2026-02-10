@@ -16,10 +16,16 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: "3.11"
 
       - name: Ensure no unresolved merge markers
         run: python tools/check_conflict_markers.py
 
       - name: Validate tracked Python sources
         run: python tools/validate_python_sources.py
+
+      - name: Compile Streamlit frontend entrypoint
+        run: python -m py_compile frontend/streamlit_app.py
+
+      - name: Compile backend and tests
+        run: python -m compileall backend/app backend/tests

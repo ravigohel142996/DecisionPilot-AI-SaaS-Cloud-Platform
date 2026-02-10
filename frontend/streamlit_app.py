@@ -1,18 +1,26 @@
-codex/build-saas-version-of-decisionpilot-ai-6zmbvb
+import os
 from datetime import datetime
-codex/build-saas-version-of-decisionpilot-ai-oqeah7
-from datetime import datetime
-main
-main
+from urllib.parse import quote_plus
+
 import requests
 import streamlit as st
+from requests import Response
 
-API_BASE_URL = st.secrets.get("api_base_url", "http://localhost:8000")
+
+def resolve_api_base_url() -> str:
+    configured_url = (
+        st.secrets.get("api_base_url")
+        or os.getenv("API_BASE_URL")
+        or os.getenv("BACKEND_URL")
+        or "http://localhost:8000"
+    )
+    return configured_url.rstrip("/")
+
+
+if "api_base_url" not in st.session_state:
+    st.session_state.api_base_url = resolve_api_base_url()
 
 st.set_page_config(page_title="DecisionPilot SaaS", page_icon="📊", layout="wide")
-codex/build-saas-version-of-decisionpilot-ai-6zmbvb
-codex/build-saas-version-of-decisionpilot-ai-oqeah7
-main
 
 st.markdown(
     """
@@ -25,11 +33,6 @@ st.markdown(
       }
       .hero h1 { margin-bottom: 0.2rem; }
       .hero p { color: #1d3557; }
-      .metric-card {
-        border: 1px solid #EAECF0;
-        border-radius: 12px;
-        padding: 0.6rem 0.8rem;
-      }
     </style>
     """,
     unsafe_allow_html=True,
@@ -49,26 +52,58 @@ if "token" not in st.session_state:
     st.session_state.token = None
 if "last_summary" not in st.session_state:
     st.session_state.last_summary = ""
-codex/build-saas-version-of-decisionpilot-ai-6zmbvb
-if "api_error" not in st.session_state:
-    st.session_state.api_error = ""
 
-main
+
 def auth_headers() -> dict[str, str]:
     return {"Authorization": f"Bearer {st.session_state.token}"}
 
 
-def api_post(path: str, **kwargs):
-    return requests.post(f"{API_BASE_URL}{path}", timeout=45, **kwargs)
+def api_post(path: str, **kwargs) -> Response | None:
+    try:
+        return requests.post(f"{st.session_state.api_base_url}{path}", timeout=45, **kwargs)
+    except requests.RequestException:
+        return None
 
 
-def api_get(path: str, **kwargs):
-    return requests.get(f"{API_BASE_URL}{path}", timeout=45, **kwargs)
+def api_get(path: str, **kwargs) -> Response | None:
+    try:
+        return requests.get(f"{st.session_state.api_base_url}{path}", timeout=45, **kwargs)
+    except requests.RequestException:
+        return None
 
 
 with st.sidebar:
     st.subheader("Environment")
-    st.caption(f"API: {API_BASE_URL}")
+    st.caption(f"API: {st.session_state.api_base_url}")
+    with st.expander("API configuration", expanded=False):
+        manual_api_base_url = st.text_input(
+            "API base URL",
+            value=st.session_state.api_base_url,
+            placeholder="https://your-backend.example.com",
+            help="Use your deployed FastAPI URL when running this UI on Streamlit Cloud.",
+        ).strip()
+        if st.button("Apply API URL", use_container_width=True):
+            st.session_state.api_base_url = manual_api_base_url.rstrip("/")
+            st.query_params["api_base_url"] = st.session_state.api_base_url
+            st.rerun()
+
+        if st.query_params.get("api_base_url") and st.query_params.get("api_base_url") != st.session_state.api_base_url:
+            st.session_state.api_base_url = st.query_params.get("api_base_url", "").rstrip("/")
+
+        st.caption(
+            "Tip: you can share a prefilled app URL with `?api_base_url=` query parameter, "
+            f"for example `?api_base_url={quote_plus('https://api.example.com')}`."
+        )
+
+    if "localhost" in st.session_state.api_base_url or "127.0.0.1" in st.session_state.api_base_url:
+        st.warning("API URL is set to localhost. This will not work on Streamlit Cloud deployments.")
+
+    health = api_get("/health")
+    if health and health.ok:
+        st.success("Backend reachable")
+    else:
+        st.error("Backend unreachable. Update API base URL in API configuration.")
+
     if st.button("Sign out", use_container_width=True):
         st.session_state.token = None
         st.session_state.last_summary = ""
@@ -94,11 +129,11 @@ with tab_auth:
                 "/auth/register",
                 json={"company_name": company, "email": email, "password": password, "full_name": name},
             )
-            if response.ok:
+            if response and response.ok:
                 st.session_state.token = response.json()["access_token"]
                 st.success("Registration successful. You're now signed in.")
             else:
-                st.error(response.text)
+                st.error(response.text if response is not None else "Request failed. Check API URL and backend status.")
 
     with right:
         st.subheader("Sign in")
@@ -109,75 +144,18 @@ with tab_auth:
 
         if login_submit:
             response = api_post("/auth/login", json={"email": login_email, "password": login_password})
-codex/build-saas-version-of-decisionpilot-ai-6zmbvb
-st.title("📊 DecisionPilot AI - SaaS Analytics Workspace")
-
-if "token" not in st.session_state:
-    st.session_state.token = None
-if "last_upload_id" not in st.session_state:
-    st.session_state.last_upload_id = None
-
-
-def get_headers() -> dict[str, str]:
-    return {"Authorization": f"Bearer {st.session_state.token}"}
-
-
-tab_auth, tab_upload = st.tabs(["Authentication", "CSV Analysis"])
-
-with tab_auth:
-    c1, c2 = st.columns(2)
-
-    with c1:
-        st.subheader("Register Workspace")
-        with st.form("register"):
-            company = st.text_input("Company name")
-            name = st.text_input("Full name")
-            email = st.text_input("Email")
-            password = st.text_input("Password", type="password")
-            register_submit = st.form_submit_button("Create account")
-
-        if register_submit:
-            response = requests.post(
-                f"{API_BASE_URL}/auth/register",
-                json={"company_name": company, "email": email, "password": password, "full_name": name},
-                timeout=30,
-            )
-            if response.ok:
+            if response and response.ok:
                 st.session_state.token = response.json()["access_token"]
-                st.success("Registration successful.")
+                st.success("Logged in successfully.")
             else:
-                st.error(response.text)
+                st.error(response.text if response is not None else "Request failed. Check API URL and backend status.")
 
-    with c2:
-        st.subheader("Sign in")
-        with st.form("login"):
-            login_email = st.text_input("Login email")
-            login_password = st.text_input("Login password", type="password")
-            login_submit = st.form_submit_button("Sign in")
-
-        if login_submit:
-            response = requests.post(
-                f"{API_BASE_URL}/auth/login",
-                json={"email": login_email, "password": login_password},
-                timeout=30,
-            )
-main
-main
-            if response.ok:
-                st.session_state.token = response.json()["access_token"]
-                st.success("Logged in.")
-            else:
-                st.error(response.text)
-
-codex/build-saas-version-of-decisionpilot-ai-6zmbvb
-codex/build-saas-version-of-decisionpilot-ai-oqeah7
-main
 with tab_workspace:
     if not st.session_state.token:
         st.warning("Please authenticate first in the Authentication tab.")
     else:
         profile = api_get("/auth/me", headers=auth_headers())
-        if not profile.ok:
+        if not profile or not profile.ok:
             st.error("Session invalid or expired. Please sign in again.")
             st.stop()
 
@@ -196,12 +174,12 @@ with tab_workspace:
                 files={"file": (uploaded.name, uploaded.getvalue(), "text/csv")},
                 headers=auth_headers(),
             )
-            if response.ok:
+            if response and response.ok:
                 payload = response.json()
                 st.session_state.last_summary = payload["summary"]
                 st.success(f"Analysis complete for upload #{payload['upload_id']}.")
             else:
-                st.error(response.text)
+                st.error(response.text if response is not None else "Request failed. Check API URL and backend status.")
 
         if st.session_state.last_summary:
             st.markdown("**Latest analysis summary**")
@@ -210,7 +188,7 @@ with tab_workspace:
         st.divider()
         st.subheader("Recent uploads")
         uploads_resp = api_get("/analysis/uploads", headers=auth_headers())
-        if uploads_resp.ok:
+        if uploads_resp and uploads_resp.ok:
             items = uploads_resp.json().get("items", [])
             if not items:
                 st.info("No uploads yet.")
@@ -221,7 +199,7 @@ with tab_workspace:
                     created = datetime.fromisoformat(row["created_at"].replace("Z", "+00:00"))
                     row_cols[1].caption(created.strftime("%Y-%m-%d %H:%M"))
                     report = api_get(f"/analysis/report/{row['id']}", headers=auth_headers())
-                    if report.ok:
+                    if report and report.ok:
                         row_cols[2].download_button(
                             "PDF",
                             data=report.content,
@@ -234,38 +212,3 @@ with tab_workspace:
                         row_cols[2].button("Unavailable", disabled=True, key=f"na-{row['id']}")
         else:
             st.error("Failed to load uploads.")
-codex/build-saas-version-of-decisionpilot-ai-6zmbvb
-    if st.session_state.token:
-        me = requests.get(f"{API_BASE_URL}/auth/me", headers=get_headers(), timeout=30)
-        if me.ok:
-            payload = me.json()
-            st.info(
-                f"Workspace: {payload['company_name']} | Plan: {payload['subscription_tier']} ({payload['subscription_status']})"
-            )
-
-with tab_upload:
-    if not st.session_state.token:
-        st.warning("Please authenticate first.")
-    else:
-        st.subheader("Upload CSV for automated analysis")
-        file = st.file_uploader("Select a CSV file", type=["csv"])
-        if file and st.button("Analyze file", type="primary"):
-            response = requests.post(
-                f"{API_BASE_URL}/analysis/upload",
-                files={"file": (file.name, file.getvalue(), "text/csv")},
-                headers=get_headers(),
-                timeout=60,
-            )
-            if response.ok:
-                payload = response.json()
-                st.session_state.last_upload_id = payload["upload_id"]
-                st.success(f"Analysis complete for upload #{payload['upload_id']}")
-                st.code(payload["summary"])
-            else:
-                st.error(response.text)
-
-        if st.session_state.last_upload_id:
-            report_url = f"{API_BASE_URL}/analysis/report/{st.session_state.last_upload_id}"
-            st.markdown(f"[Download Executive PDF Report]({report_url})")
-main
-main

@@ -104,3 +104,9 @@ Set these in backend environment for Supabase-hosted Postgres/Auth alignment:
 - `SUPABASE_JWT_SECRET`
 
 See full deployment checklist in `docs/DEPLOYMENT.md`.
+
+## Production Deployment Quick Notes
+- Backend Render service config is provided in `backend/render.yaml`.
+- Backend container entrypoint runs `uvicorn main:app --host 0.0.0.0 --port 8000`.
+- For Streamlit Cloud, set secret/environment variable `API_BASE_URL=https://visionpilot-backend.onrender.com` (or your deployed backend URL).
+- `runtime.txt` pins Python runtime for cloud deployment compatibility.

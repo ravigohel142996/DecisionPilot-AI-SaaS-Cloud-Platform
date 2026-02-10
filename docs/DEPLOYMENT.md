@@ -20,7 +20,8 @@
 ## 3) Streamlit Cloud
 - Use `frontend/streamlit_app.py` as app entrypoint.
 - Add secrets:
-  - `api_base_url`
+  - `API_BASE_URL` (recommended)
+  - `api_base_url` (legacy fallback supported)
 
 ## 4) Supabase Configuration
 - Create project/database.

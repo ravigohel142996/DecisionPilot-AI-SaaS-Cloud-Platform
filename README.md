@@ -78,3 +78,17 @@ streamlit run frontend/streamlit_app.py
 - Data access for uploads/reports enforces company-level checks.
 - Upload quota checks are enforced per plan to support future paid tiers.
 - Business logic is isolated in service modules for easier testing and scaling.
+
+## Troubleshooting
+
+### "conflict error" / syntax errors with `<<<<<<<`, `=======`, `>>>>>>>`
+
+If a branch is merged with unresolved conflict markers, Python files can fail with syntax errors.
+Use this checker before committing or opening a PR:
+
+```bash
+python tools/check_conflict_markers.py
+```
+
+It will fail fast and print exact file/line locations for unresolved markers.
+

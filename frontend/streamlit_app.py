@@ -11,7 +11,7 @@ import streamlit as st
 import streamlit.components.v1 as components
 
 st.set_page_config(
-    page_title="VisionPilot AI",
+    page_title="VisionPilot AI | SaaS Platform",
     layout="wide",
     initial_sidebar_state="expanded",
 )
@@ -27,53 +27,60 @@ API_BASE_URL = resolve_api_base_url()
 st.markdown(
     """
 <style>
-.stApp {
-    background: linear-gradient(135deg, #020617, #020024);
-    color: white;
+:root {
+    color-scheme: dark;
+}
+
+body, .stApp {
+    background-color: #0f172a;
+    color: #e5e7eb;
 }
 
 h1, h2, h3, h4, h5, h6, label, p, span, div {
-    color: #F8FAFC !important;
+    color: #e5e7eb !important;
 }
 
-h1 { font-size: 2.3rem !important; }
-h2 { font-size: 1.8rem !important; }
-p, label, span, div, .stMarkdown { font-size: 1.02rem !important; }
+h1 { font-size: 2.35rem !important; }
+h2 { font-size: 1.9rem !important; }
+p, label, span, div, .stMarkdown { font-size: 1.08rem !important; }
 
-input, select, textarea {
-    background: #020617 !important;
-    color: white !important;
-    border: 1px solid #38BDF8 !important;
+input, select, textarea,
+.stTextInput input,
+.stSelectbox div[data-baseweb="select"] > div {
+    background: #1e293b !important;
+    color: #e5e7eb !important;
+    border: 1px solid #38bdf8 !important;
     border-radius: 8px !important;
-}
-
-.stTextInput input, .stSelectbox div[data-baseweb="select"] > div {
-    background: #0f172a !important;
-    color: #F8FAFC !important;
-    border: 1px solid #38BDF8 !important;
-    border-radius: 8px !important;
+    min-height: 44px;
 }
 
 .stButton > button, .stDownloadButton > button {
-    background: linear-gradient(90deg, #38BDF8, #818CF8) !important;
-    color: black !important;
+    background: linear-gradient(90deg,#38bdf8,#818cf8) !important;
+    color: #020617 !important;
     font-weight: 700 !important;
     border-radius: 8px !important;
     border: none !important;
     font-size: 1rem !important;
+    min-height: 44px;
 }
 
-.auth-card, .glass {
-    background: rgba(15, 23, 42, 0.8);
-    backdrop-filter: blur(12px);
-    padding: 24px;
+.AuthBox, .glass {
+    background: rgba(15, 23, 42, 0.85);
+    padding: 30px;
     border-radius: 15px;
-    border: 1px solid #38BDF8;
+    border: 1px solid #38bdf8;
     box-shadow: 0 8px 24px rgba(56, 189, 248, 0.15);
     margin-bottom: 1rem;
 }
 
-.neon { color: #8cb3ff; text-shadow: 0 0 14px #5f82ff; }
+.neon {
+    color: #8cb3ff;
+    text-shadow: 0 0 14px #5f82ff;
+}
+
+[data-testid="stAlert"] {
+    font-size: 1rem;
+}
 </style>
 """,
     unsafe_allow_html=True,
@@ -97,6 +104,19 @@ def api_get(path: str, **kwargs):
     return requests.get(f"{API_BASE_URL}{path}", timeout=60, **kwargs)
 
 
+def parse_error_message(response: requests.Response) -> str:
+    try:
+        payload = response.json()
+        if isinstance(payload, dict):
+            if "error" in payload:
+                return str(payload["error"])
+            if "detail" in payload:
+                return str(payload["detail"])
+    except ValueError:
+        pass
+    return response.text.strip() or "Something went wrong. Please try again."
+
+
 def is_valid_email(email: str) -> bool:
     return bool(re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", email.strip()))
 
@@ -114,14 +134,7 @@ def password_strength(password: str) -> tuple[int, str]:
     if re.search(r"[^A-Za-z0-9]", password):
         score += 1
 
-    labels = {
-        0: "Very weak",
-        1: "Weak",
-        2: "Fair",
-        3: "Good",
-        4: "Strong",
-        5: "Very strong",
-    }
+    labels = {0: "Very weak", 1: "Weak", 2: "Fair", 3: "Good", 4: "Strong", 5: "Very strong"}
     return score, labels.get(score, "Unknown")
 
 
@@ -170,7 +183,7 @@ with login_tab:
     c1, c2 = st.columns(2)
     with c1:
         with st.container():
-            st.markdown('<div class="auth-card">', unsafe_allow_html=True)
+            st.markdown('<div class="AuthBox">', unsafe_allow_html=True)
             with st.form("register"):
                 st.subheader("Create account")
                 company = st.text_input("Company")
@@ -182,7 +195,9 @@ with login_tab:
                 st.progress(min(score / 5, 1.0), text=f"Password strength: {strength}")
 
                 if st.form_submit_button("Register"):
-                    if not is_valid_email(email):
+                    if not company.strip() or not name.strip() or not email.strip() or not password:
+                        st.error("All registration fields are required.")
+                    elif not is_valid_email(email):
                         st.error("Please enter a valid email address.")
                     elif score < 3:
                         st.warning("Use a stronger password (8+ chars, mixed case, number, symbol).")
@@ -192,46 +207,45 @@ with login_tab:
                                 res = api_post(
                                     "/auth/register",
                                     json={
-                                        "company_name": company,
-                                        "full_name": name,
-                                        "email": email,
+                                        "company_name": company.strip(),
+                                        "full_name": name.strip(),
+                                        "email": email.strip().lower(),
                                         "password": password,
                                         "role": role,
                                     },
                                 )
-                            if res.status_code == 200:
-                                st.session_state.token = res.json()["access_token"]
-                                st.success("Account Created")
-                                st.toast("Welcome to VisionPilot AI")
-                                st.balloons()
+                            if res.ok:
+                                st.success("Account created successfully! Please sign in with your new credentials.")
                             else:
-                                st.error(res.json().get("detail", "Error"))
+                                st.error(parse_error_message(res))
                         except Exception:
-                            st.error("Server offline. Try later.")
+                            st.error("Cannot reach the server right now. Please try again later.")
             st.markdown("</div>", unsafe_allow_html=True)
 
     with c2:
         with st.container():
-            st.markdown('<div class="auth-card">', unsafe_allow_html=True)
+            st.markdown('<div class="AuthBox">', unsafe_allow_html=True)
             with st.form("login"):
                 st.subheader("Sign in")
                 email = st.text_input("Login email")
                 password = st.text_input("Login password", type="password")
                 if st.form_submit_button("Login"):
-                    if not is_valid_email(email):
+                    if not email.strip() or not password:
+                        st.error("Both email and password are required.")
+                    elif not is_valid_email(email):
                         st.error("Please enter a valid email address.")
                     else:
                         try:
                             with st.spinner("Signing in..."):
-                                res = api_post("/auth/login", json={"email": email, "password": password})
-                            if res.status_code == 200:
+                                res = api_post("/auth/login", json={"email": email.strip().lower(), "password": password})
+                            if res.ok:
                                 st.session_state.token = res.json()["access_token"]
-                                st.success("Login success")
+                                st.success("Login successful. Welcome back!")
                                 st.toast("Logged in successfully")
                             else:
-                                st.error(res.json().get("detail", "Error"))
+                                st.error(parse_error_message(res))
                         except Exception:
-                            st.error("Server offline. Try later.")
+                            st.error("Cannot reach the server right now. Please try again later.")
             st.markdown("</div>", unsafe_allow_html=True)
 
 with dashboard_tab:
@@ -242,11 +256,11 @@ with dashboard_tab:
             with st.spinner("Loading profile..."):
                 profile = api_get("/auth/me", headers=auth_headers())
         except Exception:
-            st.error("Server offline. Try later.")
+            st.error("Cannot reach the server right now. Please try again later.")
             st.stop()
 
         if not profile.ok:
-            st.error("Session expired.")
+            st.error(parse_error_message(profile))
             st.stop()
 
         p = profile.json()
@@ -267,15 +281,15 @@ with dashboard_tab:
                     st.toast("Analysis complete")
                     st.code(result.json()["summary"])
                 else:
-                    st.error(result.text)
+                    st.error(parse_error_message(result))
             except Exception:
-                st.error("Server offline. Try later.")
+                st.error("Cannot reach the server right now. Please try again later.")
 
         try:
             metrics = api_get("/analysis/realtime", headers=auth_headers())
             decision = api_get("/intelligence/decision", headers=auth_headers())
         except Exception:
-            st.error("Server offline. Try later.")
+            st.error("Cannot reach the server right now. Please try again later.")
             metrics = decision = None
 
         if metrics and metrics.ok:
@@ -326,9 +340,9 @@ with dashboard_tab:
                     st.toast("Simulation complete")
                     st.json(sim.json())
                 else:
-                    st.error(sim.text)
+                    st.error(parse_error_message(sim))
             except Exception:
-                st.error("Server offline. Try later.")
+                st.error("Cannot reach the server right now. Please try again later.")
 
         try:
             uploads = api_get("/analysis/uploads", headers=auth_headers())
@@ -339,13 +353,13 @@ with dashboard_tab:
             st.subheader("Executive Reports")
             for row in uploads.json().get("items", []):
                 created = datetime.fromisoformat(row["created_at"].replace("Z", "+00:00"))
-                c1, c2, c3 = st.columns([4, 2, 2])
-                c1.write(row["filename"])
-                c2.caption(created.strftime("%Y-%m-%d %H:%M"))
+                col_name, col_date, col_action = st.columns([4, 2, 2])
+                col_name.write(row["filename"])
+                col_date.caption(created.strftime("%Y-%m-%d %H:%M"))
                 try:
                     report = api_get(f"/analysis/report/{row['id']}", headers=auth_headers())
                     if report.ok:
-                        c3.download_button(
+                        col_action.download_button(
                             "PDF",
                             report.content,
                             file_name=f"board-report-{row['id']}.pdf",
@@ -365,6 +379,6 @@ with admin_tab:
             if res.ok:
                 st.json(res.json())
             else:
-                st.warning("Admin access requires CEO/CTO role")
+                st.warning(parse_error_message(res))
         except Exception:
-            st.error("Server offline. Try later.")
+            st.error("Cannot reach the server right now. Please try again later.")

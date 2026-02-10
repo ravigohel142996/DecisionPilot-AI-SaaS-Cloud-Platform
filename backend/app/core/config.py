@@ -9,7 +9,7 @@ class Settings(BaseSettings):
     secret_key: str = "change-me"
     access_token_expire_minutes: int = 120
     database_url: str = "postgresql+psycopg://postgres:postgres@localhost:5432/decisionpilot"
-    allowed_origins: str = "http://localhost:8501,http://localhost:3000"
+    allowed_origins: str = "*"
 
     supabase_url: str = ""
     supabase_anon_key: str = ""

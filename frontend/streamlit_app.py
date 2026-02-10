@@ -1,23 +1,15 @@
-codex/build-saas-version-of-decisionpilot-ai-ogjk9v
-from datetime import datetime
-
-=======
 codex/build-saas-version-of-decisionpilot-ai-oqeah7
 from datetime import datetime
 
 =======
 main
- main
 import requests
 import streamlit as st
 
 API_BASE_URL = st.secrets.get("api_base_url", "http://localhost:8000")
 
 st.set_page_config(page_title="DecisionPilot SaaS", page_icon="📊", layout="wide")
- codex/build-saas-version-of-decisionpilot-ai-ogjk9v
-=======
 codex/build-saas-version-of-decisionpilot-ai-oqeah7
- main
 
 st.markdown(
     """
@@ -54,12 +46,10 @@ if "token" not in st.session_state:
     st.session_state.token = None
 if "last_summary" not in st.session_state:
     st.session_state.last_summary = ""
- codex/build-saas-version-of-decisionpilot-ai-ogjk9v
-=======
 if "api_error" not in st.session_state:
     st.session_state.api_error = ""
 
- main
+
 def auth_headers() -> dict[str, str]:
     return {"Authorization": f"Bearer {st.session_state.token}"}
 
@@ -115,8 +105,6 @@ with tab_auth:
 
         if login_submit:
             response = api_post("/auth/login", json={"email": login_email, "password": login_password})
- codex/build-saas-version-of-decisionpilot-ai-ogjk9v
-=======
 =======
 st.title("📊 DecisionPilot AI - SaaS Analytics Workspace")
 
@@ -170,17 +158,13 @@ with tab_auth:
                 timeout=30,
             )
 main
- main
             if response.ok:
                 st.session_state.token = response.json()["access_token"]
                 st.success("Logged in.")
             else:
                 st.error(response.text)
 
- codex/build-saas-version-of-decisionpilot-ai-ogjk9v
-=======
 codex/build-saas-version-of-decisionpilot-ai-oqeah7
- main
 with tab_workspace:
     if not st.session_state.token:
         st.warning("Please authenticate first in the Authentication tab.")
@@ -243,8 +227,6 @@ with tab_workspace:
                         row_cols[2].button("Unavailable", disabled=True, key=f"na-{row['id']}")
         else:
             st.error("Failed to load uploads.")
- codex/build-saas-version-of-decisionpilot-ai-ogjk9v
-=======
 =======
     if st.session_state.token:
         me = requests.get(f"{API_BASE_URL}/auth/me", headers=get_headers(), timeout=30)
@@ -279,4 +261,3 @@ with tab_upload:
             report_url = f"{API_BASE_URL}/analysis/report/{st.session_state.last_upload_id}"
             st.markdown(f"[Download Executive PDF Report]({report_url})")
 main
- main

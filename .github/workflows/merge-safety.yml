@@ -21,8 +21,5 @@ jobs:
       - name: Ensure no unresolved merge markers
         run: python tools/check_conflict_markers.py
 
-      - name: Compile frontend entrypoint
-        run: python -m py_compile frontend/streamlit_app.py
-
-      - name: Compile backend and tests
-        run: python -m compileall backend/app backend/tests
+      - name: Validate tracked Python sources
+        run: python tools/validate_python_sources.py

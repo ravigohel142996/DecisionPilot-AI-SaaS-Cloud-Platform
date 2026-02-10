@@ -89,7 +89,8 @@ Use this checker before committing or opening a PR:
 
 ```bash
 python tools/check_conflict_markers.py
+python tools/validate_python_sources.py
 ```
 
-It will fail fast and print exact file/line locations for unresolved markers.
+The first command detects unresolved merge markers, and the second validates every tracked Python file for syntax errors (including accidental standalone branch-label lines).
 

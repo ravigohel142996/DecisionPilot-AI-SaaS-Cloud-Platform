@@ -9,7 +9,7 @@ inject_styles()
 init_session()
 client = APIClient()
 
-st.title("VisionPilot AI - 3D Decision Intelligence Platform")
+st.title("VisionPilot AI - Decision Intelligence Platform")
 
 with st.sidebar:
     st.caption(f"API: {client.base_url}")
@@ -17,7 +17,7 @@ with st.sidebar:
     if ok:
         st.success("Backend online")
     else:
-        st.warning("Server offline")
+        st.warning("Backend offline - set API_BASE_URL correctly")
 
     if st.session_state.token and st.button("Logout", use_container_width=True):
         st.session_state.token = None
@@ -39,8 +39,8 @@ else:
     col2.metric("Email", data["email"])
     col3.metric("User ID", data["id"])
 
-    st.markdown("### Decision Dashboard")
-    st.info("Auth is configured. Connect your analytics modules here.")
+    st.markdown("### Dashboard")
+    st.info("Login is active. Connect your analytics modules here.")
 
     with st.expander("Session token"):
         st.code(st.session_state.token[:80] + "...", language="text")

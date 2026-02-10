@@ -11,12 +11,26 @@ def inject_styles() -> None:
     st.markdown(
         """
         <style>
-        .stApp { background: #0b1220; color: #e2e8f0; }
-        .block-container { max-width: 900px; padding-top: 1.5rem; }
-        h1,h2,h3,p,label,span,div { color: #e2e8f0 !important; }
-        .card { background: #111827; border: 1px solid #334155; border-radius: 14px; padding: 1rem 1.25rem; }
-        .stTextInput input { background: #1f2937 !important; color: #e2e8f0 !important; }
-        .stButton button { width: 100%; border-radius: 10px; font-weight: 700; }
+        .stApp { background: #070b14; color: #f8fafc; }
+        .block-container { max-width: 920px; padding-top: 1.5rem; }
+        h1,h2,h3,p,label,span,div { color: #f8fafc !important; }
+        [data-testid="stSidebar"] { background: #0f172a; }
+        .card { background: #111827; border: 1px solid #475569; border-radius: 14px; padding: 1rem 1.25rem; }
+        .stTextInput input {
+            background: #0f172a !important;
+            color: #f8fafc !important;
+            border: 1px solid #64748b !important;
+        }
+        .stTextInput label { color: #e2e8f0 !important; }
+        .stButton button, .stForm button {
+            width: 100%;
+            border-radius: 10px;
+            font-weight: 700;
+            background: #2563eb;
+            color: white;
+            border: none;
+        }
+        .stAlert { border-radius: 10px; }
         @media (max-width: 768px){ .block-container { padding: 0.8rem; } }
         </style>
         """,
@@ -26,60 +40,34 @@ def inject_styles() -> None:
 
 def init_session() -> None:
     st.session_state.setdefault("token", None)
-    st.session_state.setdefault("view", "login")
 
 
-def _validate_form(email: str, password: str, full_name: str = "") -> str | None:
-    if full_name is not None and full_name != "" and len(full_name.strip()) < 2:
-        return "Full name must be at least 2 characters"
+def _validate_login(email: str, password: str) -> str | None:
     if not EMAIL_REGEX.match(email.strip().lower()):
         return "Please enter a valid email address"
-    if len(password) < 8:
-        return "Password must be at least 8 characters"
+    if not password:
+        return "Password is required"
     return None
 
 
 def render_auth(client: APIClient) -> None:
-    tabs = st.tabs(["Login", "Register"])
+    st.markdown("### Login")
+    st.caption("Use the admin credentials to access VisionPilot AI.")
 
-    with tabs[0]:
-        with st.form("login_form"):
-            email = st.text_input("Email", placeholder="you@company.com")
-            password = st.text_input("Password", type="password")
-            submit = st.form_submit_button("Login")
+    with st.form("login_form"):
+        email = st.text_input("Email", value="admin@visionpilot.ai")
+        password = st.text_input("Password", type="password", value="admin123")
+        submit = st.form_submit_button("Login")
 
-            if submit:
-                error = _validate_form(email=email, password=password)
-                if error:
-                    st.error(error)
-                else:
-                    with st.spinner("Signing in..."):
-                        ok, data = client.login(email=email.strip().lower(), password=password)
-                    if ok:
-                        st.session_state.token = data["access_token"]
-                        st.success("Login successful")
-                        st.rerun()
-                    st.error(data["detail"])
-
-    with tabs[1]:
-        with st.form("register_form"):
-            full_name = st.text_input("Full name", placeholder="Alex Morgan")
-            email = st.text_input("Work email", placeholder="alex@visionpilot.ai")
-            password = st.text_input("Password", type="password", help="At least 8 characters")
-            submit = st.form_submit_button("Create account")
-
-            if submit:
-                error = _validate_form(email=email, password=password, full_name=full_name)
-                if error:
-                    st.error(error)
-                else:
-                    with st.spinner("Creating account..."):
-                        ok, data = client.register(
-                            full_name=full_name.strip(),
-                            email=email.strip().lower(),
-                            password=password,
-                        )
-                    if ok:
-                        st.success("Signup successful. Please login.")
-                    else:
-                        st.error(data["detail"])
+        if submit:
+            error = _validate_login(email=email, password=password)
+            if error:
+                st.error(error)
+            else:
+                with st.spinner("Signing in..."):
+                    ok, data = client.login(email=email.strip().lower(), password=password)
+                if ok:
+                    st.session_state.token = data["access_token"]
+                    st.success("Login successful")
+                    st.rerun()
+                st.error(data["detail"])

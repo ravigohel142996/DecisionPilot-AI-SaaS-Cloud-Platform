@@ -31,12 +31,15 @@ class APIClient:
         except requests.Timeout:
             return False, {"detail": "Request timed out. Please try again."}
         except requests.RequestException:
-            return False, {"detail": "Cannot connect to server. Verify backend URL and health."}
+            return False, {"detail": "Cannot connect to backend. Check API_BASE_URL and server health."}
 
         try:
             data = response.json()
         except ValueError:
             data = {"detail": response.text or "Unexpected server response"}
+
+        if response.status_code == 404:
+            return False, {"detail": "Backend route is unavailable. Verify backend deployment and API_BASE_URL."}
 
         if not response.ok:
             return False, {"detail": data.get("detail", "Request failed")}
@@ -44,9 +47,6 @@ class APIClient:
 
     def health(self):
         return self._request("GET", "/health")
-
-    def register(self, full_name: str, email: str, password: str):
-        return self._request("POST", "/auth/register", {"full_name": full_name, "email": email, "password": password})
 
     def login(self, email: str, password: str):
         return self._request("POST", "/auth/login", {"email": email, "password": password})

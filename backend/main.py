@@ -1,27 +1,17 @@
-import logging
 import os
 from datetime import timedelta
 
-from fastapi import Depends, FastAPI, HTTPException, Request, status
+from fastapi import Depends, FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, EmailStr, Field
-from sqlalchemy.orm import Session
 
-from auth import ACCESS_TOKEN_EXPIRE_MINUTES, create_access_token, decode_access_token, hash_password, verify_password
-from database import Base, engine, get_db
-from models import User
+from auth import ACCESS_TOKEN_EXPIRE_MINUTES, create_access_token, decode_access_token
 
-logging.basicConfig(
-    level=os.getenv("LOG_LEVEL", "INFO"),
-    format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
-)
-logger = logging.getLogger("visionpilot.backend")
+ADMIN_EMAIL = "admin@visionpilot.ai"
+ADMIN_PASSWORD = "admin123"
 
-Base.metadata.create_all(bind=engine)
-
-app = FastAPI(title="VisionPilot AI API", version="1.0.0")
+app = FastAPI(title="VisionPilot AI API", version="2.0.0")
 
 allowed_origins_env = os.getenv("ALLOWED_ORIGINS", "*")
 allowed_origins = ["*"] if allowed_origins_env.strip() == "*" else [o.strip() for o in allowed_origins_env.split(",") if o.strip()]
@@ -35,31 +25,9 @@ app.add_middleware(
 )
 
 
-@app.middleware("http")
-async def security_headers(request: Request, call_next):
-    response = await call_next(request)
-    response.headers["X-Content-Type-Options"] = "nosniff"
-    response.headers["X-Frame-Options"] = "DENY"
-    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
-    response.headers["Cache-Control"] = "no-store"
-    return response
-
-
-@app.exception_handler(Exception)
-async def global_exception_handler(request: Request, exc: Exception):
-    logger.exception("Unhandled exception on %s", request.url.path)
-    return JSONResponse(status_code=500, content={"detail": "Internal server error"})
-
-
-class RegisterRequest(BaseModel):
-    email: EmailStr
-    full_name: str = Field(min_length=2, max_length=255)
-    password: str = Field(min_length=8, max_length=128)
-
-
 class LoginRequest(BaseModel):
     email: EmailStr
-    password: str = Field(min_length=8, max_length=128)
+    password: str = Field(min_length=1, max_length=128)
 
 
 class AuthResponse(BaseModel):
@@ -70,21 +38,14 @@ class AuthResponse(BaseModel):
 security = HTTPBearer(auto_error=False)
 
 
-def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(security),
-    db: Session = Depends(get_db),
-) -> User:
+def get_current_user_email(credentials: HTTPAuthorizationCredentials = Depends(security)) -> str:
     if not credentials:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing authorization header")
 
     subject = decode_access_token(credentials.credentials)
-    if not subject:
+    if subject != ADMIN_EMAIL:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token")
-
-    user = db.query(User).filter(User.email == subject.lower()).first()
-    if not user:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
-    return user
+    return subject
 
 
 @app.get("/health")
@@ -92,43 +53,25 @@ def health_check():
     return {"status": "ok", "service": "visionpilot-backend"}
 
 
-@app.post("/auth/register", status_code=status.HTTP_201_CREATED)
-def register(payload: RegisterRequest, db: Session = Depends(get_db)):
-    email = payload.email.lower().strip()
-    existing = db.query(User).filter(User.email == email).first()
-    if existing:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email is already registered")
-
-    user = User(
-        email=email,
-        full_name=payload.full_name.strip(),
-        password_hash=hash_password(payload.password),
-    )
-    db.add(user)
-    db.commit()
-    logger.info("User registered: %s", email)
-    return {"message": "User registered successfully"}
-
-
 @app.post("/auth/login", response_model=AuthResponse)
-def login(payload: LoginRequest, db: Session = Depends(get_db)):
+def login(payload: LoginRequest):
     email = payload.email.lower().strip()
-    user = db.query(User).filter(User.email == email).first()
-    if not user or not verify_password(payload.password, user.password_hash):
+    password = payload.password
+
+    if email != ADMIN_EMAIL or password != ADMIN_PASSWORD:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password")
 
-    access_token = create_access_token(subject=user.email, expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
-    logger.info("User logged in: %s", email)
+    access_token = create_access_token(subject=ADMIN_EMAIL, expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
     return AuthResponse(access_token=access_token)
 
 
 @app.get("/auth/me")
-def me(current_user: User = Depends(get_current_user)):
+def me(current_user_email: str = Depends(get_current_user_email)):
     return {
-        "id": current_user.id,
-        "email": current_user.email,
-        "full_name": current_user.full_name,
-        "is_active": current_user.is_active,
+        "id": 1,
+        "email": current_user_email,
+        "full_name": "VisionPilot Admin",
+        "is_active": True,
     }
 
 

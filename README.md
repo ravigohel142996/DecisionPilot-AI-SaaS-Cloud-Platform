@@ -1,115 +1,251 @@
-# VisionPilot AI - 3D Decision Intelligence Platform
+# VisionPilot AI (Authentication Removed)
 
-Production-ready authentication starter for **FastAPI + Streamlit** with Render/Streamlit Cloud deployment support.
+VisionPilot now runs as an **instant dashboard app**:
+- no login
+- no signup
+- no users
+- no tokens
+- no auth routes
 
-## Folder Structure
+The frontend opens directly to the dashboard and only calls these backend routes:
+- `GET /health`
+- `GET /data`
+- `POST /predict`
+- `GET /dashboard`
+
+## New Folder Structure
 
 ```text
 backend/
   main.py
-  database.py
-  models.py
-  auth.py
   requirements.txt
+  .env.example
+  Dockerfile
+  render.yaml
+  app/
+    main.py
 frontend/
   app.py
-  auth_ui.py
+  streamlit_app.py
   api.py
   config.py
   requirements.txt
+  Dockerfile
+docs/
+  DEPLOYMENT.md
 .env.example
-runtime.txt
-README.md
+requirements.txt
+data/
+  demo_business_data.csv
 ```
 
-## Backend (FastAPI)
+## Full Cleaned Code
 
-### Features
-- `/auth/register` with duplicate-user prevention
-- `/auth/login` returning JWT bearer token
-- `/auth/me` protected profile endpoint
-- `/health` health check for deployment monitoring
-- SQLite (default) via SQLAlchemy
-- Password hashing with `passlib[bcrypt]`
-- JWT auth with `python-jose`
-- CORS configured from env (`ALLOWED_ORIGINS`)
-- Security headers middleware
-- Structured logging + global exception handling
+### `frontend/app.py`
+```python
+import pandas as pd
+import plotly.express as px
+import streamlit as st
 
-### Run backend locally
+from api import APIClient
 
-```bash
-cd backend
-python -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
-cp ../.env.example .env
-uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+st.set_page_config(page_title="VisionPilot AI", page_icon="📊", layout="wide")
+
+st.markdown(
+    """
+    <style>
+    .stApp { background: #0b1220; color: #f8fafc; }
+    .block-container { max-width: 1100px; padding-top: 1.2rem; }
+    h1, h2, h3, p, span, label, div { color: #f8fafc !important; }
+    [data-testid="stSidebar"] { background: #111827; }
+    .metric-card {
+        background: #111827;
+        border: 1px solid #334155;
+        border-radius: 12px;
+        padding: 0.8rem 1rem;
+    }
+    @media (max-width: 768px) {
+        .block-container { padding: 0.7rem; }
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
+client = APIClient()
+
+with st.sidebar:
+    st.markdown("## VisionPilot AI")
+    st.caption(f"API endpoint: {client.base_url}")
+    health_ok, _ = client.health()
+    st.success("Backend online") if health_ok else st.warning("Backend offline")
+
+st.title("Dashboard")
+st.caption("Always-on analytics dashboard. No authentication required.")
+
+dashboard_ok, dashboard = client.dashboard()
+if not dashboard_ok:
+    st.error("Dashboard is loading with fallback values.")
+    dashboard = {
+        "kpis": {"total_revenue": 0, "total_cost": 0, "total_profit": 0},
+        "latest_points": [],
+    }
+
+kpis = dashboard.get("kpis", {})
+col1, col2, col3 = st.columns(3)
+col1.metric("Total Revenue", f"${kpis.get('total_revenue', 0):,.0f}")
+col2.metric("Total Cost", f"${kpis.get('total_cost', 0):,.0f}")
+col3.metric("Total Profit", f"${kpis.get('total_profit', 0):,.0f}")
+
+st.markdown("### Trend Data")
+data_ok, data_payload = client.data()
+records = data_payload.get("records", []) if data_ok else dashboard.get("latest_points", [])
+
+df = pd.DataFrame(records)
+if not df.empty and {"revenue", "cost"}.issubset(df.columns):
+    x_axis = "month" if "month" in df.columns else df.index
+    fig = px.line(df, x=x_axis, y=["revenue", "cost"], markers=True, template="plotly_dark")
+    fig.update_layout(margin=dict(l=20, r=20, t=30, b=20), legend_title_text="")
+    st.plotly_chart(fig, use_container_width=True)
+    st.dataframe(df, use_container_width=True)
+else:
+    st.info("No records yet.")
+
+st.markdown("### Quick Prediction")
+left, right = st.columns([2, 1])
+with left:
+    revenue = st.number_input("Revenue", min_value=0.0, value=120000.0, step=1000.0)
+    cost = st.number_input("Cost", min_value=0.0, value=80000.0, step=1000.0)
+    growth = st.slider("Expected growth rate", min_value=-0.2, max_value=1.0, value=0.12, step=0.01)
+with right:
+    st.write("")
+    run = st.button("Run prediction", use_container_width=True)
+
+if run:
+    ok, prediction = client.predict(revenue, cost, growth)
+    if ok:
+        st.success("Prediction complete")
+        p1, p2, p3 = st.columns(3)
+        p1.metric("Current Profit", f"${prediction['profit']:,.0f}")
+        p2.metric("Projected Revenue", f"${prediction['projected_revenue']:,.0f}")
+        p3.metric("Projected Profit", f"${prediction['projected_profit']:,.0f}")
+        st.caption(f"Risk level: {prediction['risk'].title()}")
+    else:
+        st.error(prediction["detail"])
 ```
 
-## Frontend (Streamlit)
+### `backend/main.py`
+```python
+import os
+from typing import Any
 
-### Features
-- Dark, high-contrast UI
-- Login/Register forms with input validation
-- Loading spinners + success/error alerts
-- API timeout and offline handling
-- Token stored in Streamlit session state
-- Dashboard only visible after login
+import pandas as pd
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel, Field
 
-### Run frontend locally
+APP_TITLE = "VisionPilot AI API"
+APP_VERSION = "3.0.0"
+DATA_FILE = os.getenv("DATA_FILE", "../data/demo_business_data.csv")
 
-```bash
-cd frontend
-python -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
-export API_BASE_URL=http://localhost:8000
-streamlit run app.py
+app = FastAPI(title=APP_TITLE, version=APP_VERSION)
+
+allowed_origins_env = os.getenv("ALLOWED_ORIGINS", "*")
+allowed_origins = ["*"] if allowed_origins_env.strip() == "*" else [o.strip() for o in allowed_origins_env.split(",") if o.strip()]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=allowed_origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+class PredictRequest(BaseModel):
+    revenue: float = Field(ge=0)
+    cost: float = Field(ge=0)
+    growth_rate: float = Field(default=0.05, ge=-1, le=3)
+
+
+def _load_records(limit: int = 12) -> list[dict[str, Any]]:
+    try:
+        df = pd.read_csv(DATA_FILE)
+        return df.head(limit).to_dict(orient="records")
+    except Exception:
+        return [
+            {"month": "Jan", "revenue": 120000, "cost": 80000},
+            {"month": "Feb", "revenue": 132000, "cost": 84000},
+            {"month": "Mar", "revenue": 140000, "cost": 87000},
+        ]
+
+
+@app.get("/health")
+def health_check() -> dict[str, str]:
+    return {"status": "ok", "service": "visionpilot-backend"}
+
+
+@app.get("/data")
+def get_data() -> dict[str, Any]:
+    records = _load_records()
+    return {"records": records, "count": len(records)}
+
+
+@app.post("/predict")
+def predict(payload: PredictRequest) -> dict[str, Any]:
+    profit = payload.revenue - payload.cost
+    projected_revenue = payload.revenue * (1 + payload.growth_rate)
+    projected_profit = projected_revenue - payload.cost
+    risk = "low" if projected_profit >= profit else "medium"
+
+    return {
+        "profit": round(profit, 2),
+        "projected_revenue": round(projected_revenue, 2),
+        "projected_profit": round(projected_profit, 2),
+        "risk": risk,
+    }
+
+
+@app.get("/dashboard")
+def dashboard() -> dict[str, Any]:
+    records = _load_records(limit=6)
+    total_revenue = sum(float(r.get("revenue", 0)) for r in records)
+    total_cost = sum(float(r.get("cost", 0)) for r in records)
+    return {
+        "title": "VisionPilot AI Dashboard",
+        "kpis": {
+            "total_revenue": round(total_revenue, 2),
+            "total_cost": round(total_cost, 2),
+            "total_profit": round(total_revenue - total_cost, 2),
+        },
+        "latest_points": records,
+    }
+
+
+if __name__ == "__main__":
+    import uvicorn
+
+    uvicorn.run("main:app", host="0.0.0.0", port=int(os.getenv("PORT", "8000")))
+```
+
+### `requirements.txt`
+```text
+-r backend/requirements.txt
 ```
 
 ## Deployment Steps
 
-### Render (Backend)
-1. Create new **Web Service** from repo.
-2. Root directory: `backend`
-3. Build command: `pip install -r requirements.txt`
-4. Start command: `uvicorn main:app --host 0.0.0.0 --port $PORT`
-5. Add environment variables from `.env.example` (set strong `SECRET_KEY`).
-6. Health check path: `/health`
-
 ### Streamlit Cloud (Frontend)
-1. Create app from repo.
-2. Main file path: `frontend/app.py`
-3. Add secrets:
+1. App file: `frontend/app.py`
+2. Optional secret:
    - `API_BASE_URL = "https://<your-render-backend>.onrender.com"`
-   - `REQUEST_TIMEOUT_SECONDS = "20"`
+3. Deploy.
 
-## Testing Steps
+### Render (Backend)
+1. Root directory: `backend`
+2. Build command: `pip install -r requirements.txt`
+3. Start command: `uvicorn main:app --host 0.0.0.0 --port $PORT`
+4. Health check path: `/health`
+5. Optional env: `ALLOWED_ORIGINS=*`
 
-### API smoke test
-
-```bash
-curl http://localhost:8000/health
-curl -X POST http://localhost:8000/auth/register \
-  -H 'Content-Type: application/json' \
-  -d '{"full_name":"Demo User","email":"demo@example.com","password":"DemoPass#123"}'
-curl -X POST http://localhost:8000/auth/login \
-  -H 'Content-Type: application/json' \
-  -d '{"email":"demo@example.com","password":"DemoPass#123"}'
-```
-
-## Troubleshooting Guide
-
-- **404 / Not Found for signup/login**
-  - Verify backend is running and paths are exactly `/auth/register` and `/auth/login`.
-- **Server offline on frontend**
-  - Confirm `API_BASE_URL` points to live backend URL.
-  - Check Render service logs and `/health` endpoint.
-- **Login fails**
-  - Ensure same email casing (system normalizes to lowercase).
-  - Confirm user exists and password is 8+ chars.
-- **CORS errors**
-  - Set `ALLOWED_ORIGINS` to frontend domain(s), comma-separated.
-- **Invalid token / session reset**
-  - Ensure `SECRET_KEY` is stable across backend restarts.
-- **Text contrast issues**
-  - UI style is high-contrast dark mode; clear browser cache if stale CSS appears.
+No auth secrets are required.

@@ -14,42 +14,40 @@ class APIClient:
         method: str,
         path: str,
         payload: Optional[Dict[str, Any]] = None,
-        token: Optional[str] = None,
     ) -> Tuple[bool, Dict[str, Any]]:
-        headers = {"Content-Type": "application/json"}
-        if token:
-            headers["Authorization"] = f"Bearer {token}"
-
         try:
             response = requests.request(
                 method=method,
                 url=f"{self.base_url}{path}",
                 json=payload,
-                headers=headers,
                 timeout=REQUEST_TIMEOUT_SECONDS,
             )
         except requests.Timeout:
-            return False, {"detail": "Request timed out. Please try again."}
+            return False, {"detail": "Request timed out."}
         except requests.RequestException:
-            return False, {"detail": "Cannot connect to backend. Check API_BASE_URL and server health."}
+            return False, {"detail": "Backend unavailable."}
 
         try:
             data = response.json()
         except ValueError:
-            data = {"detail": response.text or "Unexpected server response"}
-
-        if response.status_code == 404:
-            return False, {"detail": "Backend route is unavailable. Verify backend deployment and API_BASE_URL."}
+            return False, {"detail": "Unexpected backend response."}
 
         if not response.ok:
-            return False, {"detail": data.get("detail", "Request failed")}
+            return False, {"detail": "Dashboard data is temporarily unavailable."}
         return True, data
 
     def health(self):
         return self._request("GET", "/health")
 
-    def login(self, email: str, password: str):
-        return self._request("POST", "/auth/login", {"email": email, "password": password})
+    def dashboard(self):
+        return self._request("GET", "/dashboard")
 
-    def me(self, token: str):
-        return self._request("GET", "/auth/me", token=token)
+    def data(self):
+        return self._request("GET", "/data")
+
+    def predict(self, revenue: float, cost: float, growth_rate: float):
+        return self._request(
+            "POST",
+            "/predict",
+            {"revenue": revenue, "cost": cost, "growth_rate": growth_rate},
+        )

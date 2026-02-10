@@ -6,6 +6,7 @@ class RegisterRequest(BaseModel):
     email: EmailStr
     password: str = Field(min_length=8)
     full_name: str = ""
+    role: str = Field(default="ceo", pattern="^(ceo|cto|manager|analyst)$")
 
 
 class LoginRequest(BaseModel):
@@ -27,3 +28,10 @@ class UserProfile(BaseModel):
     company_name: str
     subscription_tier: str
     subscription_status: str
+
+
+class CreateUserRequest(BaseModel):
+    email: EmailStr
+    full_name: str = ""
+    password: str = Field(min_length=8)
+    role: str = Field(pattern="^(ceo|cto|manager|analyst)$")

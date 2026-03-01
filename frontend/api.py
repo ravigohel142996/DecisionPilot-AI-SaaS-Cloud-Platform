@@ -45,9 +45,9 @@ class APIClient:
     def data(self):
         return self._request("GET", "/data")
 
-    def predict(self, revenue: float, cost: float, growth_rate: float):
+    def predict(self, revenue: float, cost: float, growth_rate: float, model_type: str = "baseline"):
         return self._request(
             "POST",
             "/predict",
-            {"revenue": revenue, "cost": cost, "growth_rate": growth_rate},
+            {"revenue": revenue, "cost": cost, "growth_rate": growth_rate, "model_type": model_type},
         )

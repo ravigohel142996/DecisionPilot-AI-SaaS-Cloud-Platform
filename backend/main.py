@@ -1,5 +1,5 @@
 import os
-from typing import Any
+from typing import Any, Literal
 
 import pandas as pd
 from fastapi import FastAPI
@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 APP_TITLE = "VisionPilot AI API"
-APP_VERSION = "3.0.0"
+APP_VERSION = "3.1.0"
 DATA_FILE = os.getenv("DATA_FILE", "../data/demo_business_data.csv")
 
 app = FastAPI(title=APP_TITLE, version=APP_VERSION)
@@ -28,6 +28,15 @@ class PredictRequest(BaseModel):
     revenue: float = Field(ge=0)
     cost: float = Field(ge=0)
     growth_rate: float = Field(default=0.05, ge=-1, le=3)
+    model_type: Literal["baseline", "conservative", "aggressive", "ai_ensemble"] = "baseline"
+
+
+MODEL_PROFILES: dict[str, dict[str, float]] = {
+    "baseline": {"growth_multiplier": 1.0, "risk_buffer": 1.0, "confidence": 0.86},
+    "conservative": {"growth_multiplier": 0.78, "risk_buffer": 1.22, "confidence": 0.92},
+    "aggressive": {"growth_multiplier": 1.35, "risk_buffer": 0.88, "confidence": 0.79},
+    "ai_ensemble": {"growth_multiplier": 1.12, "risk_buffer": 0.95, "confidence": 0.9},
+}
 
 
 def _load_records(limit: int = 12) -> list[dict[str, Any]]:
@@ -40,6 +49,14 @@ def _load_records(limit: int = 12) -> list[dict[str, Any]]:
             {"month": "Feb", "revenue": 132000, "cost": 84000},
             {"month": "Mar", "revenue": 140000, "cost": 87000},
         ]
+
+
+def _risk_band(margin: float, volatility_index: float) -> str:
+    if margin >= 0.35 and volatility_index < 0.28:
+        return "low"
+    if margin >= 0.2 and volatility_index < 0.45:
+        return "medium"
+    return "high"
 
 
 @app.get("/health")
@@ -55,15 +72,27 @@ def get_data() -> dict[str, Any]:
 
 @app.post("/predict")
 def predict(payload: PredictRequest) -> dict[str, Any]:
+    profile = MODEL_PROFILES[payload.model_type]
+
     profit = payload.revenue - payload.cost
-    projected_revenue = payload.revenue * (1 + payload.growth_rate)
+    adjusted_growth = payload.growth_rate * profile["growth_multiplier"]
+    projected_revenue = payload.revenue * (1 + adjusted_growth)
     projected_profit = projected_revenue - payload.cost
-    risk = "low" if projected_profit >= profit else "medium"
+
+    margin = projected_profit / projected_revenue if projected_revenue else 0
+    growth_volatility = abs(payload.growth_rate - adjusted_growth) * profile["risk_buffer"]
+    cost_pressure = (payload.cost / payload.revenue - 0.5) * 0.6 if payload.revenue else 1
+    volatility_index = max(growth_volatility + cost_pressure, 0)
+    risk = _risk_band(margin, volatility_index)
 
     return {
+        "model_type": payload.model_type,
         "profit": round(profit, 2),
         "projected_revenue": round(projected_revenue, 2),
         "projected_profit": round(projected_profit, 2),
+        "profit_delta": round(projected_profit - profit, 2),
+        "confidence": round(profile["confidence"], 2),
+        "volatility_index": round(volatility_index, 2),
         "risk": risk,
     }
 
